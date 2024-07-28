@@ -6,7 +6,9 @@ import static org.objectweb.asm.Opcodes.*;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.Reader;
@@ -16,6 +18,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+
+import javax.management.RuntimeErrorException;
+import javax.print.DocFlavor.URL;
 
 import org.lilystudio.smarty4j.statement.Document;
 import org.lilystudio.util.DynamicClassLoader;
@@ -135,6 +140,37 @@ public class Template {
     }
   }
 
+  private static InputStream openInputStrean(File file) {
+    InputStream ins = null;
+
+    if (file.toString().startsWith("classpath:")) {
+      try {
+        String resourceFile = file.toString().substring("classpath:".length());
+        System.out.println("-- load resource:  " + resourceFile.toString());
+        ClassLoader classloader = Thread.currentThread().getContextClassLoader();
+        java.net.URL url = classloader.getResource(resourceFile);
+        System.out.println("-- load resource:  " + url.toString());
+        ins = url.openStream();
+        ins = classloader.getResourceAsStream(resourceFile);
+
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+        // TODO: handle exception
+      }
+    }
+    else {
+      System.out.println("-- load file: " + file.toString());
+      try {
+        ins = new FileInputStream(file);
+      } catch (FileNotFoundException e) {
+        // TODO: handle exception
+        throw new RuntimeException(e);
+      }
+    }
+    return ins;
+
+  }
+
   /**
    * 根据文件的内容新建模板对象。
    * 
@@ -149,7 +185,7 @@ public class Template {
    */
   Template(Engine engine, File file) throws IOException, TemplateException {
     this(engine, file.getAbsolutePath(), new InputStreamReader(
-        new FileInputStream(file), engine.getEncoding()), true);
+        openInputStrean(file), engine.getEncoding()), true);
     this.file = file;
     name = path.substring(engine.getTemplatePath().length());
     lastModified = file.lastModified();
